@@ -1,8 +1,19 @@
 import streamlit as st
-import pandas as pd
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
-import os
 
+def guardar_en_google_sheets(datos):
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    
+    creds_dict = dict(st.secrets["google_sheets"])
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    client = gspread.authorize(creds)
+    
+    sheet = client.open("Respuestas_Encuesta_Vapeo").sheet1
+    
+    fila = list(datos.values())
+    sheet.append_row(fila)
 st.set_page_config(page_title="Encuesta Anónima: Consumo de Vapeadores", page_icon="📊", layout="centered")
 
 st.markdown("""
