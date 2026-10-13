@@ -1,19 +1,8 @@
 import streamlit as st
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+import pandas as pd
 from datetime import datetime
+from streamlit_gsheets import GSheetsConnection
 
-def guardar_en_google_sheets(datos):
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    
-    creds_dict = dict(st.secrets["google_sheets"])
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-    client = gspread.authorize(creds)
-    
-    sheet = client.open("Respuestas_Encuesta_Vapeo").sheet1
-    
-    fila = list(datos.values())
-    sheet.append_row(fila)
 st.set_page_config(page_title="Encuesta Anónima: Consumo de Vapeadores", page_icon="📊", layout="centered")
 
 st.markdown("""
@@ -30,14 +19,24 @@ st.title("Encuesta Anónima sobre el Consumo y los Factores Asociados al Vapeo")
 
 st.divider()
 
-CSV_FILE = "respuestas_vapeo.csv"
-
-def guardar_respuesta(datos):
-    df_nuevo = pd.DataFrame([datos])
-    if not os.path.exists(CSV_FILE):
-        df_nuevo.to_csv(CSV_FILE, index=False, encoding='utf-8-sig')
-    else:
-        df_nuevo.to_csv(CSV_FILE, mode='a', header=False, index=False, encoding='utf-8-sig')
+def guardar_en_sheets(datos):
+    try:
+        conn = st.connection("gsheets", type=GSheetsConnection)
+        
+        try:
+            df_existente = conn.read(worksheet="Hoja 1", ttl=0)
+            if df_existente.empty or len(df_existente.columns) <= 1:
+                df_existente = pd.DataFrame(columns=list(datos.keys()))
+        except Exception:
+            df_existente = pd.DataFrame(columns=list(datos.keys()))
+            
+        df_nuevo = pd.DataFrame([datos])
+        df_actualizado = pd.concat([df_existente, df_nuevo], ignore_index=True)
+        conn.update(worksheet="Hoja 1", data=df_actualizado)
+        return True
+    except Exception as e:
+        st.error(f"Hubo un error al guardar los datos: {e}")
+        return False
 
 with st.form("formulario_encuesta"):
     
@@ -95,15 +94,16 @@ with st.form("formulario_encuesta"):
     if enviado:
         respuesta_data = {
             "Fecha_Hora": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "P1_Grado": p1, "P2_Edad": p2, "P3_Genero": p3, "P4_ConversasCasa": p4, "P5_AdultoConfianza": p5,
-            "P6_ProbadoVaper": p6, "P7_Frecuencia": p7, "P8_EdadPrimerContacto": p8, "P9_ContextoPrimeraVez": p9,
-            "P10_QuienOfrecio": p10, "P11_MotivoPrincipal": p11, "P12_SabiaEfectos": p12, "P13_Curiosidad": p13,
-            "P14_Encajar": p14, "P15_EstresEmociones": p15, "P16_SaboresDiseños": p16, "P17_RedesSociales": p17,
-            "P18_FamiliaresVapean": p18, "P19_AmigosVapean": p19, "P20_ProblemasPersonales": p20, "P21_MenosPerjudicial": p21,
-            "P22_FacilidadDecirNo": p22, "P23_InsistenciaBurlas": p23, "P24_LugaresColegio": ", ".join(p24),
-            "P25_FacilidadConseguir": p25, "P26_MenosPerjudicialCigarrillo": p26, "P27_PadresHablado": p27,
-            "P28_ColegioCharlas": p28, "P29_ActividadUtil": p29, "P30_PensadoReducir": p30
+            "Grado": p1, "Edad": p2, "Genero": p3, "ConversasCasa": p4, "AdultoConfianza": p5,
+            "ProbadoVaper": p6, "Frecuencia": p7, "EdadPrimerContacto": p8, "ContextoPrimeraVez": p9,
+            "QuienOfrecio": p10, "MotivoPrincipal": p11, "SabiaEfectos": p12, "Curiosidad": p13,
+            "Encajar": p14, "EstresEmociones": p15, "SaboresDisenos": p16, "RedesSociales": p17,
+            "FamiliaresVapean": p18, "AmigosVapean": p19, "ProblemasPersonales": p20, "MenosPerjudicial": p21,
+            "FacilidadDecirNo": p22, "InsistenciaBurlas": p23, "LugaresColegio": ", ".join(p24),
+            "FacilidadConseguir": p25, "MenosPerjudicialCigarrillo": p26, "PadresHablado": p27,
+            "ColegioCharlas": p28, "ActividadUtil": p29, "PensadoReducir": p30
         }
         
-        guardar_respuesta(respuesta_data)
-        st.success("Tus respuestas han sido registradas de forma segura y anónima.")
+        exito = guardar_en_sheets(respuesta_data)
+        if exito:
+            st.success("Tus respuestas han sido registradas de forma segura y anónima.")
