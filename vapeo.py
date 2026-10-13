@@ -5,6 +5,14 @@ import os
 
 st.set_page_config(page_title="Encuesta Anónima: Consumo de Vapeadores", page_icon="📊", layout="centered")
 
+st.markdown("""
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    </style>
+""", unsafe_allow_html=True)
+
 st.title("Encuesta Anónima sobre el Consumo y los Factores Asociados al Vapeo")
 
 st.divider()
