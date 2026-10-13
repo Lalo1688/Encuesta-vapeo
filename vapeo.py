@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
+import os
 from datetime import datetime
-from streamlit_gsheets import GSheetsConnection
 
 st.set_page_config(page_title="Encuesta Anónima: Consumo de Vapeadores", page_icon="📊", layout="centered")
 
@@ -19,24 +19,14 @@ st.title("Encuesta Anónima sobre el Consumo y los Factores Asociados al Vapeo")
 
 st.divider()
 
-def guardar_en_sheets(datos):
-    try:
-        conn = st.connection("gsheets", type=GSheetsConnection)
-        
-        try:
-            df_existente = conn.read(worksheet="Hoja 1", ttl=0)
-            if df_existente.empty or len(df_existente.columns) <= 1:
-                df_existente = pd.DataFrame(columns=list(datos.keys()))
-        except Exception:
-            df_existente = pd.DataFrame(columns=list(datos.keys()))
-            
-        df_nuevo = pd.DataFrame([datos])
-        df_actualizado = pd.concat([df_existente, df_nuevo], ignore_index=True)
-        conn.update(worksheet="Hoja 1", data=df_actualizado)
-        return True
-    except Exception as e:
-        st.error(f"Hubo un error al guardar los datos: {e}")
-        return False
+CSV_FILE = "respuestas_vapeo.csv"
+
+def guardar_respuesta(datos):
+    df_nuevo = pd.DataFrame([datos])
+    if not os.path.exists(CSV_FILE):
+        df_nuevo.to_csv(CSV_FILE, index=False, encoding='utf-8-sig')
+    else:
+        df_nuevo.to_csv(CSV_FILE, mode='a', header=False, index=False, encoding='utf-8-sig')
 
 with st.form("formulario_encuesta"):
     
@@ -88,7 +78,7 @@ with st.form("formulario_encuesta"):
     st.header("Sección 5. Prevención y posibles cambios")
     p29 = st.radio("29. ¿Qué tipo de actividad preventiva te parecería más útil?", ["Charlas con profesionales de la salud", "Talleres participativos", "Información anónima y clara", "Actividades sobre manejo del estrés y emociones", "Orientación para resistir la presión de grupo", "Material informativo para familias", "Campañas creadas por estudiantes", "Otra", "Ninguna", "Prefiero no responder"], key="p29")
     p30 = st.radio("30. Si has vapeado, ¿has pensado en reducir o dejar el consumo?", ["Sí", "No", "No estoy seguro/a", "No he vapeado / No aplica", "Prefiero no responder"], key="p30")
-
+    
     enviado = st.form_submit_button("Enviar Encuesta de Forma Anónima")
 
     if enviado:
@@ -104,6 +94,23 @@ with st.form("formulario_encuesta"):
             "ColegioCharlas": p28, "ActividadUtil": p29, "PensadoReducir": p30
         }
         
-        exito = guardar_en_sheets(respuesta_data)
-        if exito:
-            st.success("Tus respuestas han sido registradas de forma segura y anónima.")
+        guardar_respuesta(respuesta_data)
+        st.success("¡Muchas gracias! Tus respuestas han sido registradas de forma segura y anónima.")
+
+st.divider()
+st.subheader("Acceso Administrador")
+pin = st.text_input("Ingresa el PIN para descargar los datos:", type="password")
+
+if pin == "ilovelinux":
+    if os.path.exists(CSV_FILE):
+        with open(CSV_FILE, "rb") as f:
+            st.download_button(
+                label="Descargar Respuestas",
+                data=f,
+                file_name="respuestas_encuesta_vapeo.csv",
+                mime="text/csv"
+            )
+    else:
+        st.info("Aún no hay respuestas registradas en el sistema.")
+elif pin != "":
+    st.error("Incorrecto, ¿para qué quieres descargar las respuestas?.")
